@@ -16,7 +16,7 @@ from keras.layers import Input, merge, Convolution2D, MaxPooling2D, UpSampling2D
 from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 from keras import backend as K
-from keras.utils.visualize_util import plot
+#from keras.utils.visualize_util import plot
 from keras.optimizers import SGD
 
 import sys
@@ -68,78 +68,84 @@ def get_unet(n_ch,patch_height,patch_width):
 
     return model
 
-
-
-#========= Load settings from Config file
-config = ConfigParser.RawConfigParser()
-config.read('configuration.txt')
-#patch to the datasets
-path_data = config.get('data paths', 'path_local')
-#Experiment name
-name_experiment = config.get('experiment name', 'name')
-#training settings
-N_epochs = int(config.get('training settings', 'N_epochs'))
-batch_size = int(config.get('training settings', 'batch_size'))
+def train(config):
+    #========= Load settings from Config file
+    #patch to the datasets
+    path_data = config.get('data paths', 'path_local')
+    #Experiment name
+    name_experiment = config.get('experiment name', 'name')
+    #training settings
+    N_epochs = int(config.get('training settings', 'N_epochs'))
+    batch_size = int(config.get('training settings', 'batch_size'))
 
 
 
-#============ Load the data and divided in patches
-patches_imgs_train, patches_masks_train, patches_imgs_test, patches_masks_test = get_data_training(
-    DRIVE_train_imgs_original = path_data + config.get('data paths', 'train_imgs_original'),
-    DRIVE_train_groudTruth = path_data + config.get('data paths', 'train_groundTruth'),  #masks
-    DRIVE_test_imgs_original = path_data + config.get('data paths', 'test_imgs_original'),  #original
-    DRIVE_test_groudTruth = path_data + config.get('data paths', 'test_groundTruth'),  #masks
-    Imgs_to_test = int(config.get('training settings', 'full_images_to_test')),
-    patch_height = int(config.get('data attributes', 'patch_height')),
-    patch_width = int(config.get('data attributes', 'patch_width')),
-    N_subimgs = int(config.get('training settings', 'N_subimgs')),
-    inside_FOV = config.getboolean('training settings', 'inside_FOV') #select the patches only inside the FOV  (default == True)
-)
+    #============ Load the data and divided in patches
+    patches_imgs_train, patches_masks_train, patches_imgs_test, patches_masks_test = get_data_training(
+        DRIVE_train_imgs_original = path_data + config.get('data paths', 'train_imgs_original'),
+        DRIVE_train_groudTruth = path_data + config.get('data paths', 'train_groundTruth'),  #masks
+        DRIVE_test_imgs_original = path_data + config.get('data paths', 'test_imgs_original'),  #original
+        DRIVE_test_groudTruth = path_data + config.get('data paths', 'test_groundTruth'),  #masks
+        Imgs_to_test = int(config.get('training settings', 'full_images_to_test')),
+        patch_height = int(config.get('data attributes', 'patch_height')),
+        patch_width = int(config.get('data attributes', 'patch_width')),
+        N_subimgs = int(config.get('training settings', 'N_subimgs')),
+        inside_FOV = config.getboolean('training settings', 'inside_FOV') #select the patches only inside the FOV  (default == True)
+    )
 
 
-#========= Save a sample of what you're feeding to the neural network ==========
-N_sample = min(patches_imgs_train.shape[0],40)
-visualize(group_images(patches_imgs_train[0:N_sample,:,:,:],5),'./'+name_experiment+'/'+"sample_input_imgs")#.show()
-visualize(group_images(patches_masks_train[0:N_sample,:,:,:],5),'./'+name_experiment+'/'+"sample_input_masks")#.show()
-visualize(group_images(patches_imgs_test[0:N_sample,:,:,:],5),'./'+name_experiment+'/'+"sample_test_imgs")#.show()
-visualize(group_images(patches_masks_test[0:N_sample,:,:,:],5),'./'+name_experiment+'/'+"sample_test_masks")#.show()
+    #========= Save a sample of what you're feeding to the neural network ==========
+    N_sample = min(patches_imgs_train.shape[0],40)
+    visualize(group_images(patches_imgs_train[0:N_sample,:,:,:],5),'./'+name_experiment+'/'+"sample_input_imgs")#.show()
+    visualize(group_images(patches_masks_train[0:N_sample,:,:,:],5),'./'+name_experiment+'/'+"sample_input_masks")#.show()
+    visualize(group_images(patches_imgs_test[0:N_sample,:,:,:],5),'./'+name_experiment+'/'+"sample_test_imgs")#.show()
+    visualize(group_images(patches_masks_test[0:N_sample,:,:,:],5),'./'+name_experiment+'/'+"sample_test_masks")#.show()
 
 
-#=========== Construct and save the model arcitecture =====
-n_ch = patches_imgs_train.shape[1]
-patch_height = patches_imgs_train.shape[2]
-patch_width = patches_imgs_train.shape[3]
-model = get_unet(n_ch, patch_height, patch_width)  #the U-net model
-print "Check: final output of the network:"
-print model.output_shape
-plot(model, to_file='./'+name_experiment+'/'+name_experiment + '_model.png')   #check how the model looks like
-json_string = model.to_json()
-open('./'+name_experiment+'/'+name_experiment +'_architecture.json', 'w').write(json_string)
+    #=========== Construct and save the model arcitecture =====
+    n_ch = patches_imgs_train.shape[1]
+    patch_height = patches_imgs_train.shape[2]
+    patch_width = patches_imgs_train.shape[3]
+    model = get_unet(n_ch, patch_height, patch_width)  #the U-net model
+    print "Check: final output of the network:"
+    print model.output_shape
+    #plot(model, to_file='./'+name_experiment+'/'+name_experiment + '_model.png')   #check how the model looks like
+    json_string = model.to_json()
+    open('./'+name_experiment+'/'+name_experiment +'_architecture.json', 'w').write(json_string)
 
 
 
-#============  Training ==================================
-checkpointer = ModelCheckpoint(filepath='./'+name_experiment+'/'+name_experiment +'_best_weights.h5', verbose=1, monitor='val_loss', mode='auto', save_best_only=True) #save at each epoch if the validation decreased
+    #============  Training ==================================
+    checkpointer = ModelCheckpoint(filepath='./'+name_experiment+'/'+name_experiment +'_best_weights.h5', verbose=1, monitor='val_loss', mode='auto', save_best_only=True) #save at each epoch if the validation decreased
 
 
-# def step_decay(epoch):
-#     lrate = 0.01 #the initial learning rate (by default in keras)
-#     if epoch==100:
-#         return 0.005
-#     else:
-#         return lrate
-#
-# lrate_drop = LearningRateScheduler(step_decay)
+    # def step_decay(epoch):
+    #     lrate = 0.01 #the initial learning rate (by default in keras)
+    #     if epoch==100:
+    #         return 0.005
+    #     else:
+    #         return lrate
+    #
+    # lrate_drop = LearningRateScheduler(step_decay)
 
-model.fit(patches_imgs_train, masks_Unet(patches_masks_train), nb_epoch=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_data=(patches_imgs_test, masks_Unet(patches_masks_test)), callbacks=[checkpointer])
+    model.fit(patches_imgs_train, masks_Unet(patches_masks_train), nb_epoch=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_data=(patches_imgs_test, masks_Unet(patches_masks_test)), callbacks=[checkpointer])
+
+    return model
+    #========== Save and test the last model ===================
+    model.save_weights('./'+name_experiment+'/'+name_experiment +'_last_weights.h5', overwrite=True)
+    #test the model
+    # score = model.evaluate(patches_imgs_test, masks_Unet(patches_masks_test), verbose=0)
+    # print('Test score:', score[0])
+    # print('Test accuracy:', score[1])
+
+def main():
+    config = ConfigParser.RawConfigParser()
+    config.read('configuration.txt')
+    train(config)
 
 
-#========== Save and test the last model ===================
-model.save_weights('./'+name_experiment+'/'+name_experiment +'_last_weights.h5', overwrite=True)
-#test the model
-# score = model.evaluate(patches_imgs_test, masks_Unet(patches_masks_test), verbose=0)
-# print('Test score:', score[0])
-# print('Test accuracy:', score[1])
+if __name__ == "__main__":
+    main()
 
 
 
