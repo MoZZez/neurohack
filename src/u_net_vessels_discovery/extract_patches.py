@@ -103,7 +103,13 @@ def get_data_testing(DRIVE_test_imgs_original, DRIVE_test_groudTruth, Imgs_to_te
 
 # Load the original data and return the extracted patches for testing
 # return the ground truth in its original shape
-def get_data_testing_overlap(DRIVE_test_imgs_original, DRIVE_test_groudTruth, Imgs_to_test, patch_height, patch_width, stride_height, stride_width):
+def get_data_testing_overlap(DRIVE_test_imgs_original,
+                             DRIVE_test_groudTruth,
+                             Imgs_to_test,
+                             patch_height,
+                             patch_width,
+                             stride_height,
+                             stride_width):
     ### test
     test_imgs_original = load_hdf5(DRIVE_test_imgs_original)
     test_masks = load_hdf5(DRIVE_test_groudTruth)
