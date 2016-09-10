@@ -20,8 +20,6 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import jaccard_similarity_score
 from sklearn.metrics import f1_score
-import sys
-sys.path.insert(0, './lib/')
 # help_functions.py
 from help_functions import *
 # extract_patches.py
@@ -37,17 +35,24 @@ from pre_processing import my_PreProc
 
 
 #========= CONFIG FILE TO READ FROM =======
+# грузим конфиг
 config = ConfigParser.RawConfigParser()
 config.read('configuration.txt')
 #===========================================
 #run the training on invariant or local
+# путь где лежат данные (модель?)
 path_data = config.get('data paths', 'path_local')
 
 #original test images (for FOV selection)
+# путь где лежат картинки
 DRIVE_test_imgs_original = path_data + config.get('data paths', 'test_imgs_original')
+
+# загрузка картинок из hdf5
 test_imgs_orig = load_hdf5(DRIVE_test_imgs_original)
 full_img_height = test_imgs_orig.shape[2]
 full_img_width = test_imgs_orig.shape[3]
+
+
 #the border masks provided by the DRIVE
 DRIVE_test_border_masks = path_data + config.get('data paths', 'test_border_masks')
 test_border_masks = load_hdf5(DRIVE_test_border_masks)
@@ -67,15 +72,6 @@ Imgs_to_test = int(config.get('testing settings', 'full_images_to_test'))
 N_visual = int(config.get('testing settings', 'N_group_visual'))
 #====== average mode ===========
 average_mode = config.getboolean('testing settings', 'average_mode')
-
-
-# #ground truth
-# gtruth= path_data + config.get('data paths', 'test_groundTruth')
-# img_truth= load_hdf5(gtruth)
-# visualize(group_images(test_imgs_orig[0:20,:,:,:],5),'original')#.show()
-# visualize(group_images(test_border_masks[0:20,:,:,:],5),'borders')#.show()
-# visualize(group_images(img_truth[0:20,:,:,:],5),'gtruth')#.show()
-
 
 
 #============ Load the data and divide in patches

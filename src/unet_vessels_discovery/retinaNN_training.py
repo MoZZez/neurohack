@@ -19,8 +19,6 @@ from keras import backend as K
 #from keras.utils.visualize_util import plot
 from keras.optimizers import SGD
 
-import sys
-sys.path.insert(0, './lib/')
 from help_functions import *
 
 #function to obtain data for training/testing (validation)
