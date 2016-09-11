@@ -33,13 +33,12 @@ N_epochs: 100
 batch_size: 32
 N_group_visual: 1
 
+#patch_processor: !factory:extract_patches.SequentialPatchProcessor
+#  height: 48
+#  width: 48
 
-patch_processor: !factory:extract_patches.SequentialPatchProcessor
-  height: 48
-  width: 48
-
-#patch_processor: !factory:extract_patches.OverlapPatchProcessor
-#  patch_height: 48
-#  patch_width: 48
-#  stride_height: 45
-#  stride_width: 45
+patch_processor: !factory:extract_patches.OverlapPatchProcessor
+  patch_height: 48
+  patch_width: 48
+  stride_height: 25
+  stride_width: 25

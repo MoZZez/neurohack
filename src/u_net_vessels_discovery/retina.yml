@@ -29,5 +29,5 @@ N_group_visual: 1
 #Compute average in the prediction, improve results but require more patches to be predicted
 average_mode: False
 #Only if average_mode==True. Stride of the average, lower value require more patches to be predicted
-stride_height: 45
-stride_width: 45
+stride_height: 35
+stride_width: 35

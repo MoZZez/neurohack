@@ -124,10 +124,13 @@ def evaluate(images, predictions, targets, config):
     print "y_scores:", y_true[:100]
     y_true[y_true < 0.5] = 0
     y_true[y_true >= 0.5] = 1
+    y_true = y_true.astype(bool)
     print "y_scores:", y_true[:100]
+    print "y_true shape:", y_true.shape
+    print "y_scores shape:", y_scores.shape
 
     # Area under the ROC curve
-    fpr, tpr, thresholds = roc_curve((y_true), y_scores)
+    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
     AUC_ROC = roc_auc_score(y_true, y_scores)
     # test_integral = np.trapz(tpr,fpr) #trapz is numpy integration
     print "\nArea under the ROC curve: " + str(AUC_ROC)
