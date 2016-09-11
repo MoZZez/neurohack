@@ -2,7 +2,8 @@ import ConfigParser
 import h5py
 import numpy as np
 from PIL import Image
-
+from configure import Configuration
+import os
 
 def load_hdf5(infile):
   with h5py.File(infile,"r") as f:  #"with" close the file after its nested commands
@@ -95,4 +96,10 @@ def pred_to_imgs(pred,mode="original"):
 def load_config(filename):
     config = ConfigParser.RawConfigParser()
     config.read(filename)
+    return config
+
+
+def load_yaml_config(filename):
+    filename = os.path.abspath(filename)
+    config = Configuration.from_file(filename).configure()
     return config

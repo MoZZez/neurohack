@@ -408,3 +408,23 @@ def inside_FOV_DRIVE(i, x, y, DRIVE_masks):
         return True
     else:
         return False
+
+
+class SequentialPatchProcessor(object):
+    def __init__(self, height, width):
+        self.height=height
+        self.width=width
+        self.image_height = None
+        self.image_width = None
+
+    def split(self, images):
+        self.image_height = images.shape[2]
+        self.image_width = images.shape[3]
+        return extract_ordered(images, self.height, self.width)
+
+    def recompone(self, patches):
+        height_count = int(self.image_height/self.height)
+        width_count = int(self.image_width/self.width)
+        images = recompone(patches, height_count, width_count)
+        images = images[:, :, 0:self.image_height, 0:self.image_width]
+        return images

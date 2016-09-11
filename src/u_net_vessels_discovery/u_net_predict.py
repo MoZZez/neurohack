@@ -63,15 +63,16 @@ def load_model(model_structure, model_weights):
 
 
 def predict(config):
-    images  = load_image_set(config.get('data paths', 'images'))
-    targets = load_image_set(config.get('data paths', 'targets'), to_grayscale=True)
+    images  = load_image_set(config["images"])
+    targets = load_image_set(config["targets"], to_grayscale=True)
 
-    patch_height = int(config.get('data attributes', 'patch_height'))
-    patch_width = int(config.get('data attributes', 'patch_width'))
+    patch_processor = config["patch_processor"]
 
-    images_patches, targets_patches = split_to_patches(images, targets, patch_height, patch_width)
-    model = load_model(config.get("testing settings", "model_architecture"),
-                       config.get("testing settings", "model_weights"))
+    images_patches = patch_processor.split(my_PreProc(images))
+    targets_patches = patch_processor.split(targets / 255.0)
+
+    model = load_model(config["model_architecture"],
+                       config["model_weights"])
 
     predictions_patches = model.predict(images_patches, batch_size=32, verbose=2)
     print "predicted images size :"
@@ -79,25 +80,16 @@ def predict(config):
 
     predictions_patches = pred_to_imgs(predictions_patches, "original")
 
-    full_images_height = images.shape[2]
-    full_images_width = images.shape[3]
-    patches_height_count = int(full_images_height / patch_height)
-    patches_width_count = int(full_images_width / patch_width)
-
-    predictions_restored = recompone(predictions_patches, patches_height_count, patches_width_count)
-    images_restored = recompone(images_patches, patches_height_count, patches_width_count)
-    targets_restored = recompone(targets_patches, patches_height_count, patches_width_count)
-
-    images_restored = images_restored[:, :, 0:full_images_height, 0:full_images_width]
-    predictions_restored = predictions_restored[:, :, 0:full_images_height, 0:full_images_width]
-    targets_restored = targets_restored[:, :, 0:full_images_height, 0:full_images_width]
+    predictions_restored = patch_processor.recompone(predictions_patches)
+    images_restored = patch_processor.recompone(images_patches)
+    targets_restored = patch_processor.recompone(targets_patches)
     return images_restored, predictions_restored, targets_restored
 
 
 def evaluate(images, predictions, targets, config):
     print "\n\n========  Evaluate the results ======================="
-    N_visual = int(config.get('testing settings', 'N_group_visual'))
-    name_experiment = config.get('experiment name', 'name')
+    N_visual = int(config.get('N_group_visual'))
+    name_experiment = config.get('name')
     path_experiment = './' + name_experiment + '/'
     if not os.path.isdir(path_experiment):
         os.mkdir(path_experiment)
@@ -207,17 +199,17 @@ def evaluate(images, predictions, targets, config):
     file_perf.close()
 
 
-@argh.arg('config', type=load_config, help='config file')
+@argh.arg('config', type=load_yaml_config, help='config file')
 def predict_eval(config):
     images_restored, predictions_restored, targets_restored = predict(config)
     evaluate(images_restored, predictions_restored, targets_restored, config)
 
 
-@argh.arg('config', type=load_config, help='config file')
+@argh.arg('config', type=load_yaml_config, help='config file')
 def retrain_nn(config):
     LOG.info("retrain neural net with config: {}".format(config))
-    images  = load_image_set(config.get('data paths', 'images'))
-    targets = load_image_set(config.get('data paths', 'targets'), to_grayscale=True)
+    images  = load_image_set(config.get('images'))
+    targets = load_image_set(config.get('targets'), to_grayscale=True)
 
     LOG.info("images shape: {}".format(images.shape))
     LOG.info("targets shape: {}".format(targets.shape))
@@ -228,12 +220,12 @@ def retrain_nn(config):
     targets_test = targets[-1:,:,:,:]
     images_train_patches, targets_targets_patches = split_to_patches(images_train,
                                                                      targets_train,
-                                                                     int(config.get('data attributes', 'patch_height')),
-                                                                     int(config.get('data attributes', 'patch_width')))
+                                                                     int(config.get('patch_height')),
+                                                                     int(config.get('patch_width')))
     images_test_patches, targets_test_patches = split_to_patches(images_test,
                                                                  targets_test,
-                                                                 int(config.get('data attributes', 'patch_height')),
-                                                                 int(config.get('data attributes', 'patch_width')))
+                                                                 int(config.get('patch_height')),
+                                                                 int(config.get('patch_width')))
 
     LOG.info("train images patches shape: {}".format(images_train_patches.shape))
     LOG.info("train targets patches shape: {}".format(targets_targets_patches.shape))
@@ -242,22 +234,22 @@ def retrain_nn(config):
 
     LOG.info("Compiling model... ")
     start = time.time()
-    model = load_model(config.get("retrain", "model_architecture"),
-                       config.get("retrain", "input_weights"))
+    model = load_model(config.get("model_architecture"),
+                       config.get("retrain_input_weights"))
     model.compile(optimizer='adam', loss='categorical_crossentropy',metrics=['accuracy'])
     LOG.info("... done in {}s".format(time.time() - start))
 
     LOG.info("Training models")
     start = time.time()
-    model_checkpoint = ModelCheckpoint(filepath=config.get("retrain", "best_weights"),
+    model_checkpoint = ModelCheckpoint(filepath=config.get("retrain_best_weights"),
                                        verbose=1,
                                        monitor='val_loss',
                                        mode='auto',
                                        save_best_only=True)
     model.fit(images_train_patches,
               masks_Unet(targets_targets_patches),
-              nb_epoch=int(config.get("retrain", "N_epochs")),
-              batch_size=int(config.get("retrain", "batch_size")),
+              nb_epoch=int(config.get("N_epochs")),
+              batch_size=int(config.get("batch_size")),
               verbose=2,
               shuffle=True,
               validation_data=(images_test_patches, masks_Unet(targets_test_patches)),
@@ -266,7 +258,7 @@ def retrain_nn(config):
 
     LOG.info("Saving model...")
     start = time.time()
-    model.save_weights(config.get("retrain", "last_weights"), overwrite=True)
+    model.save_weights(config.get("retrain_last_weights"), overwrite=True)
     LOG.info("... done in {}s".format(time.time() - start))
 
 
