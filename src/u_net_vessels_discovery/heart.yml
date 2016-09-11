@@ -1,0 +1,44 @@
+images: ../../data/u_net_raw_data_1/samples
+targets: ../../data/u_net_raw_data_1/labels
+
+name: hearts_02
+
+#Dimensions of the patches extracted from the full images
+patch_height: 48
+patch_width: 48
+
+
+#number of total patches:
+N_subimgs: 40
+#Number of training epochs
+N_epochs: 1
+batch_size: 32
+#number of full images for the validation (max 20)
+full_images_to_test: 1
+#if running with nohup
+nohup: False
+
+#Choose the model to test: best==epoch with min loss, last==last epoch
+model_architecture: ../../data/u_net_retina_model/architecture.json
+model_weights: ../../data/u_net_heart_model/best_weights.h5
+best_last: best
+#number of full images for the test (max 20)
+full_images_to_test: 1
+
+retrain_input_weights: ../../data/u_net_retina_model/best_weights.h5
+retrain_best_weights: ../../data/u_net_heart_model/best_weights_01.h5
+retrain_last_weights: ../../data/u_net_heart_model/last_weights_01.h5
+#Number of training epochs
+N_epochs: 100
+batch_size: 32
+
+
+#patch_processor: !factory:extract_patches.SequentialPatchProcessor
+#  height: 48
+#  width: 48
+
+patch_processor: !factory:extract_patches.OverlapPatchProcessor
+  patch_height: 48
+  patch_width: 48
+  stride_height: 45
+  stride_width: 45
