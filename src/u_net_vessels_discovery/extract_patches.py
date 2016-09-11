@@ -283,8 +283,8 @@ def recompone_overlap(preds, img_h, img_w, stride_h, stride_w):
     assert (preds.shape[1]==1 or preds.shape[1]==3)  #check the channel is 1 or 3
     patch_h = preds.shape[2]
     patch_w = preds.shape[3]
-    N_patches_h = (img_h-patch_h)//stride_h+1
-    N_patches_w = (img_w-patch_w)//stride_w+1
+    N_patches_h = (img_h-patch_h)//stride_h+2
+    N_patches_w = (img_w-patch_w)//stride_w+2
     N_patches_img = N_patches_h * N_patches_w
     print "N_patches_h: " +str(N_patches_h)
     print "N_patches_w: " +str(N_patches_w)
@@ -453,7 +453,10 @@ class OverlapPatchProcessor(object):
                                        self.stride_height,
                                        self.stride_width)
 
-    def recpomone(self, patches):
+    def recompone(self, patches):
+        print("Recompone called. Patches shape {}".format(patches.shape))
+        print("Image size: {}x{}".format(self.image_height, self.image_width))
+        print("Stride size: {}x{}".format(self.stride_height, self.stride_width))
         return recompone_overlap(patches,
                                  self.image_height,
                                  self.image_width,
