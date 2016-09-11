@@ -412,8 +412,8 @@ def inside_FOV_DRIVE(i, x, y, DRIVE_masks):
 
 class SequentialPatchProcessor(object):
     def __init__(self, height, width):
-        self.height=height
-        self.width=width
+        self.height = height
+        self.width = width
         self.image_height = None
         self.image_width = None
 
@@ -423,8 +423,39 @@ class SequentialPatchProcessor(object):
         return extract_ordered(images, self.height, self.width)
 
     def recompone(self, patches):
-        height_count = int(self.image_height/self.height)
-        width_count = int(self.image_width/self.width)
+        height_count = int(self.image_height / self.height)
+        width_count = int(self.image_width / self.width)
         images = recompone(patches, height_count, width_count)
         images = images[:, :, 0:self.image_height, 0:self.image_width]
         return images
+
+
+class OverlapPatchProcessor(object):
+    def __init__(self, patch_height, patch_width, stride_height, stride_width):
+        self.patch_height = patch_height
+        self.patch_width = patch_width
+        self.stride_height = stride_height
+        self.stride_width = stride_width
+        self.image_height = None
+        self.image_width = None
+
+    def split(self, images):
+        self.image_height = images.shape[2]
+        self.image_width = images.shape[3]
+        images = paint_border_overlap(images,
+                                      self.patch_height,
+                                      self.patch_width,
+                                      self.stride_height,
+                                      self.stride_width)
+        return extract_ordered_overlap(images,
+                                       self.patch_height,
+                                       self.patch_width,
+                                       self.stride_height,
+                                       self.stride_width)
+
+    def recpomone(self, patches):
+        return recompone_overlap(patches,
+                                 self.image_height,
+                                 self.image_width,
+                                 self.stride_height,
+                                 self.stride_width)
