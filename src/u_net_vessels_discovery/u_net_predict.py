@@ -10,6 +10,7 @@
 import ConfigParser
 
 import argh
+import time
 from keras.callbacks import ModelCheckpoint
 from matplotlib import pyplot as plt
 from keras.models import model_from_json
@@ -26,7 +27,10 @@ import cv2
 import os
 import numpy as np
 from extract_patches import extract_ordered
+import logging
 
+LOG = logging.getLogger('u_net_predict')
+LOG.setLevel('INFO')
 
 # Load the original data and return the extracted patches for training/testing
 def split_to_patches(samples,
@@ -34,8 +38,7 @@ def split_to_patches(samples,
                      patch_height=48,
                      patch_width=48):
     samples = my_PreProc(samples)
-    labels = labels / 255.
-
+    labels /= 255.0
     patches_imgs_test = extract_ordered(samples, patch_height, patch_width)
     patches_masks_test = extract_ordered(labels, patch_height, patch_width)
     return patches_imgs_test, patches_masks_test
@@ -203,6 +206,7 @@ def evaluate(images, predictions, targets, config):
                     )
     file_perf.close()
 
+
 @argh.arg('config', type=load_config, help='config file')
 def predict_eval(config):
     images_restored, predictions_restored, targets_restored = predict(config)
@@ -211,10 +215,12 @@ def predict_eval(config):
 
 @argh.arg('config', type=load_config, help='config file')
 def retrain_nn(config):
-    model = load_model(config.get("retrain", "model_architecture"),
-                       config.get("retrain", "model_weights"))
+    LOG.info("retrain neural net with config: {}".format(config))
     images  = load_image_set(config.get('data paths', 'images'))
     targets = load_image_set(config.get('data paths', 'targets'), to_grayscale=True)
+
+    LOG.info("images shape: {}".format(images.shape))
+    LOG.info("targets shape: {}".format(targets.shape))
 
     images_train = images[:-1,:,:,:]
     targets_train = targets[:-1,:,:,:]
@@ -229,6 +235,20 @@ def retrain_nn(config):
                                                                  int(config.get('data attributes', 'patch_height')),
                                                                  int(config.get('data attributes', 'patch_width')))
 
+    LOG.info("train images patches shape: {}".format(images_train_patches.shape))
+    LOG.info("train targets patches shape: {}".format(targets_targets_patches.shape))
+    LOG.info("test images patches shape: {}".format(images_test_patches.shape))
+    LOG.info("test targets patches shape: {}".format(targets_test_patches.shape))
+
+    LOG.info("Compiling model... ")
+    start = time.time()
+    model = load_model(config.get("retrain", "model_architecture"),
+                       config.get("retrain", "input_weights"))
+    model.compile(optimizer='adam', loss='categorical_crossentropy',metrics=['accuracy'])
+    LOG.info("... done in {}s".format(time.time() - start))
+
+    LOG.info("Training models")
+    start = time.time()
     model_checkpoint = ModelCheckpoint(filepath=config.get("retrain", "best_weights"),
                                        verbose=1,
                                        monitor='val_loss',
@@ -236,13 +256,18 @@ def retrain_nn(config):
                                        save_best_only=True)
     model.fit(images_train_patches,
               masks_Unet(targets_targets_patches),
-              nb_epoch=config.get("retrain", "N_epochs"),
-              batch_size=config.get("retrain", "batch_size"),
+              nb_epoch=int(config.get("retrain", "N_epochs")),
+              batch_size=int(config.get("retrain", "batch_size")),
               verbose=2,
               shuffle=True,
               validation_data=(images_test_patches, masks_Unet(targets_test_patches)),
               callbacks=[model_checkpoint])
+    LOG.info("... done in {}s".format(time.time() - start))
+
+    LOG.info("Saving model...")
+    start = time.time()
     model.save_weights(config.get("retrain", "last_weights"), overwrite=True)
+    LOG.info("... done in {}s".format(time.time() - start))
 
 
 def main():
