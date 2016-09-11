@@ -27,7 +27,7 @@ from extract_patches import get_data_training
 
 
 #Define the neural network
-def get_unet(n_ch,patch_height,patch_width):
+def create_nn_architectire(n_ch, patch_height, patch_width):
     inputs = Input((n_ch, patch_height, patch_width))
     conv1 = Convolution2D(32, 3, 3, activation='relu', border_mode='same')(inputs)
     conv1 = Dropout(0.2)(conv1)
@@ -104,7 +104,7 @@ def train(config):
     n_ch = patches_imgs_train.shape[1]
     patch_height = patches_imgs_train.shape[2]
     patch_width = patches_imgs_train.shape[3]
-    model = get_unet(n_ch, patch_height, patch_width)  #the U-net model
+    model = create_nn_architectire(n_ch, patch_height, patch_width)  #the U-net model
     print "Check: final output of the network:"
     print model.output_shape
     #plot(model, to_file='./'+name_experiment+'/'+name_experiment + '_model.png')   #check how the model looks like
@@ -112,29 +112,14 @@ def train(config):
     open('./'+name_experiment+'/'+name_experiment +'_architecture.json', 'w').write(json_string)
 
 
-
-    #============  Training ==================================
     checkpointer = ModelCheckpoint(filepath='./'+name_experiment+'/'+name_experiment +'_best_weights.h5', verbose=1, monitor='val_loss', mode='auto', save_best_only=True) #save at each epoch if the validation decreased
 
-
-    # def step_decay(epoch):
-    #     lrate = 0.01 #the initial learning rate (by default in keras)
-    #     if epoch==100:
-    #         return 0.005
-    #     else:
-    #         return lrate
-    #
-    # lrate_drop = LearningRateScheduler(step_decay)
 
     model.fit(patches_imgs_train, masks_Unet(patches_masks_train), nb_epoch=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_data=(patches_imgs_test, masks_Unet(patches_masks_test)), callbacks=[checkpointer])
 
     return model
     #========== Save and test the last model ===================
     model.save_weights('./'+name_experiment+'/'+name_experiment +'_last_weights.h5', overwrite=True)
-    #test the model
-    # score = model.evaluate(patches_imgs_test, masks_Unet(patches_masks_test), verbose=0)
-    # print('Test score:', score[0])
-    # print('Test accuracy:', score[1])
 
 def main():
     config = ConfigParser.RawConfigParser()
