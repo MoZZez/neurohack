@@ -1,6 +1,6 @@
 [data paths]
-samples = ../../data/u_net_raw_data_1/samples
-labels = ../../data/u_net_raw_data_1/labels
+images = ../../data/u_net_raw_data_1/samples
+targets = ../../data/u_net_raw_data_1/labels
 
 [experiment name]
 name = my_test

@@ -52,7 +52,7 @@ def load_image_set(dataset_dir, to_grayscale=False):
     images = np.asarray(map(cv2.imread, files))
     images = np.transpose(images, (0, 3, 1, 2))
     if to_grayscale:
-        images = images.mean(axis=1).reshape((images[0], 1, images[2], images[3]))
+        images = images.mean(axis=1).reshape((images.shape[0], 1, images.shape[2], images.shape[3]))
     return images
 
 
@@ -64,86 +64,72 @@ def load_model(model_structure, model_weights):
     return model
 
 
-def predict(config):
-    samples = load_image_set(config.get('data paths', 'samples'))
-    labels = load_image_set(config.get('data paths', 'labels'), to_grayscale=True)
-
-    # dimension of the patches
+def predict_internal(images, targets, config):
     patch_height = int(config.get('data attributes', 'patch_height'))
     patch_width = int(config.get('data attributes', 'patch_width'))
 
-    full_img_height = samples.shape[2]
-    full_img_width = samples.shape[3]
+    images_patches, targets_patches = split_to_patches(images, targets, patch_height, patch_width)
+    model = load_model(config.get("testing settings", "model_architecture"),
+                       config.get("testing settings", "model_weights"))
 
+    predictions_patches = model.predict(images_patches, batch_size=32, verbose=2)
+    print "predicted images size :"
+    print predictions_patches.shape
+
+    predictions_patches = pred_to_imgs(predictions_patches, "original")
+
+    full_images_height = images.shape[2]
+    full_images_width = images.shape[3]
+    patches_height_count = int(full_images_height / patch_height)
+    patches_width_count = int(full_images_width / patch_width)
+
+    predictions_restored = recompone(predictions_patches, patches_height_count, patches_width_count)
+    images_restored = recompone(images_patches, patches_height_count, patches_width_count)
+    targets_restored = recompone(targets_patches, patches_height_count, patches_width_count)
+
+    images_restored = images_restored[:, :, 0:full_images_height, 0:full_images_width]
+    predictions_restored = predictions_restored[:, :, 0:full_images_height, 0:full_images_width]
+    targets_restored = targets_restored[:, :, 0:full_images_height, 0:full_images_width]
+    return images_restored, predictions_restored, targets_restored
+
+
+def evaluate(images, predictions, targets, config):
+    print "\n\n========  Evaluate the results ======================="
+    N_visual = int(config.get('testing settings', 'N_group_visual'))
     name_experiment = config.get('experiment name', 'name')
-
     path_experiment = './' + name_experiment + '/'
     if not os.path.isdir(path_experiment):
         os.mkdir(path_experiment)
 
-    N_visual = int(config.get('testing settings', 'N_group_visual'))
-    patches_imgs, patches_masks = split_to_patches(samples, labels, patch_height, patch_width)
-
-    # ================ Run the prediction of the patches ==================================
-    # Load the saved model
-    model = load_model(config.get("testing settings", "model_architecture"),
-                       config.get("testing settings", "model_weights"))
-
-    predictions = model.predict(patches_imgs, batch_size=32, verbose=2)
-    print "predicted images size :"
-    print predictions.shape
-
-    # ===== Convert the prediction arrays in corresponding images
-    pred_patches = pred_to_imgs(predictions, "original")
-
-    # ========== Elaborate and visualize the predicted images ====================
-    patches_height_count = int(full_img_height / patch_height)
-    patches_width_count = int(full_img_width / patch_height)
-
-    pred_imgs = recompone(pred_patches, patches_height_count, patches_width_count)  # predictions
-    orig_imgs = recompone(patches_imgs, patches_height_count, patches_width_count)  # originals
-    gtruth_masks = recompone(patches_masks, patches_height_count, patches_width_count)  # masks
-
-    ## back to original dimensions
-    orig_imgs = orig_imgs[:, :, 0:full_img_height, 0:full_img_width]
-    pred_imgs = pred_imgs[:, :, 0:full_img_height, 0:full_img_width]
-    gtruth_masks = gtruth_masks[:, :, 0:full_img_height, 0:full_img_width]
-
-    print "Orig imgs shape: " + str(orig_imgs.shape)
-    print "pred imgs shape: " + str(pred_imgs.shape)
-    print "Gtruth imgs shape: " + str(gtruth_masks.shape)
-    visualize(group_images(orig_imgs, N_visual), path_experiment + "all_originals")
-    visualize(group_images(pred_imgs, N_visual), path_experiment + "all_predictions")
-    visualize(group_images(gtruth_masks, N_visual), path_experiment + "all_groundTruths")
+    print "Orig imgs shape: " + str(images.shape)
+    print "pred imgs shape: " + str(predictions.shape)
+    print "Gtruth imgs shape: " + str(targets.shape)
+    visualize(group_images(images, N_visual), path_experiment + "all_originals")
+    visualize(group_images(predictions, N_visual), path_experiment + "all_predictions")
+    visualize(group_images(targets, N_visual), path_experiment + "all_groundTruths")
 
     # visualize results comparing mask and prediction:
-    assert (orig_imgs.shape[0] == pred_imgs.shape[0] and orig_imgs.shape[0] == gtruth_masks.shape[0])
-    N_predicted = orig_imgs.shape[0]
+    assert (images.shape[0] == predictions.shape[0] and images.shape[0] == targets.shape[0])
+    N_predicted = images.shape[0]
     group = N_visual
     assert (N_predicted % group == 0)
     for i in range(int(N_predicted / group)):
-        orig_stripe = group_images(orig_imgs[i * group:(i * group) + group, :, :, :], group)
-        masks_stripe = group_images(gtruth_masks[i * group:(i * group) + group, :, :, :], group)
-        pred_stripe = group_images(pred_imgs[i * group:(i * group) + group, :, :, :], group)
-        print "orig_stripe.shape", orig_stripe.shape
-        print "masks_stripe.shape", masks_stripe.shape
-        print "pred_stripe.shape", pred_stripe.shape
-        total_img = np.concatenate((orig_stripe, masks_stripe, pred_stripe), axis=0)
-        visualize(total_img, path_experiment + name_experiment + "_Original_GroundTruth_Prediction" + str(i))  # .show()
+        images_stripe = group_images(images[i * group:(i * group) + group, :, :, :], group)
+        targets_stripe = group_images(targets[i * group:(i * group) + group, :, :, :], group)
+        predictions_stripe = group_images(predictions[i * group:(i * group) + group, :, :, :], group)
+        total = np.concatenate((images_stripe, targets_stripe, predictions_stripe), axis=0)
+        visualize(total, path_experiment + name_experiment + "_Original_GroundTruth_Prediction" + str(i))
 
-    # ====== Evaluate the results
-    print "\n\n========  Evaluate the results ======================="
-    # predictions only inside the FOV
-    y_scores = pred_imgs.reshape(np.prod(pred_imgs.shape))
-    y_true = gtruth_masks.reshape(np.prod(gtruth_masks.shape))
+    y_scores = predictions.reshape(np.prod(predictions.shape))
+    y_true = targets.reshape(np.prod(targets.shape))
 
     print "Calculating results only inside the FOV:"
     print "y scores pixels: " + str(
         y_scores.shape[0]) + " (radius 270: 270*270*3.14==228906), including background around retina: " + str(
-        pred_imgs.shape[0] * pred_imgs.shape[2] * pred_imgs.shape[3]) + " (584*565==329960)"
+        predictions.shape[0] * predictions.shape[2] * predictions.shape[3]) + " (584*565==329960)"
     print "y true pixels: " + str(
         y_true.shape[0]) + " (radius 270: 270*270*3.14==228906), including background around retina: " + str(
-        gtruth_masks.shape[2] * gtruth_masks.shape[3] * gtruth_masks.shape[0]) + " (584*565==329960)"
+        targets.shape[2] * targets.shape[3] * targets.shape[0]) + " (584*565==329960)"
     print "y_scores:", y_true[:100]
     y_true[y_true < 0.5] = 0
     y_true[y_true >= 0.5] = 1
@@ -154,7 +140,7 @@ def predict(config):
     AUC_ROC = roc_auc_score(y_true, y_scores)
     # test_integral = np.trapz(tpr,fpr) #trapz is numpy integration
     print "\nArea under the ROC curve: " + str(AUC_ROC)
-    roc_curve_fig = plt.figure()
+    plt.figure()
     plt.plot(fpr, tpr, '-', label='Area Under the Curve (AUC = %0.4f)' % AUC_ROC)
     plt.title('ROC curve')
     plt.xlabel("FPR (False Positive Rate)")
@@ -168,7 +154,7 @@ def predict(config):
     recall = np.fliplr([recall])[0]  # so the array is increasing (you won't get negative AUC)
     AUC_prec_rec = np.trapz(precision, recall)
     print "\nArea under Precision-Recall curve: " + str(AUC_prec_rec)
-    prec_rec_curve = plt.figure()
+    plt.figure()
     plt.plot(recall, precision, '-', label='Area Under the Curve (AUC = %0.4f)' % AUC_prec_rec)
     plt.title('Precision - Recall curve')
     plt.xlabel("Recall")
@@ -218,6 +204,13 @@ def predict(config):
                     + "\nPRECISION: " + str(precision)
                     )
     file_perf.close()
+
+
+def predict(config):
+    images  = load_image_set(config.get('data paths', 'images'))
+    targets = load_image_set(config.get('data paths', 'targets'), to_grayscale=True)
+    images_restored, predictions_restored, targets_restored = predict_internal(images, targets, config)
+    evaluate(images_restored, predictions_restored, targets_restored, config)
 
 
 def main():
