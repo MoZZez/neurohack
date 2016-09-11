@@ -203,7 +203,13 @@ def evaluate(images, predictions, targets, config):
                     )
     file_perf.close()
 
+@argh.arg('config', type=load_config, help='config file')
+def predict_eval(config):
+    images_restored, predictions_restored, targets_restored = predict(config)
+    evaluate(images_restored, predictions_restored, targets_restored, config)
 
+
+@argh.arg('config', type=load_config, help='config file')
 def retrain_nn(config):
     model = load_model(config.get("retrain", "model_architecture"),
                        config.get("retrain", "model_weights"))
@@ -239,14 +245,12 @@ def retrain_nn(config):
     model.save_weights(config.get("retrain", "last_weights"), overwrite=True)
 
 
-@argh.arg('config', type=load_config, help='config file')
-@argh.arg('--retrain', type=bool, help='retrain or predict')
-def main(config, retrain=False):
-    if not retrain:
-        images_restored, predictions_restored, targets_restored = predict(config)
-        evaluate(images_restored, predictions_restored, targets_restored, config)
-    else:
-        retrain_nn(config)
+def main():
+    commands = [
+        retrain_nn,
+        predict_eval
+    ]
+    argh.dispatch_commands(commands)
 
 if __name__ == "__main__":
-    argh.dispatch_command(main)
+    main()
