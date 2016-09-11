@@ -21,10 +21,7 @@ from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import jaccard_similarity_score
 from sklearn.metrics import f1_score
 from help_functions import *
-from extract_patches import recompone
 from pre_processing import my_PreProc
-import cv2
-import os
 import numpy as np
 from extract_patches import extract_ordered
 import logging
@@ -44,13 +41,14 @@ def split_to_patches(samples,
     return patches_imgs_test, patches_masks_test
 
 
-def load_image_set(dataset_dir, to_grayscale=False):
+def load_image_set(dataset_dir):
     files = os.listdir(dataset_dir)
     files = map(lambda x: os.path.join(dataset_dir, x), files)
-    images = np.asarray(map(cv2.imread, files))
+    images = np.asarray(map(lambda x: np.asarray(Image.open(x)), files))
+    if len(images.shape) == 3:
+        images = images.reshape((list(images.shape) + [1]))
+    print ("Images.shape: {}".format(images.shape))
     images = np.transpose(images, (0, 3, 1, 2))
-    if to_grayscale:
-        images = images.mean(axis=1).reshape((images.shape[0], 1, images.shape[2], images.shape[3]))
     return images
 
 
@@ -64,7 +62,7 @@ def load_model(model_structure, model_weights):
 
 def predict(config):
     images  = load_image_set(config["images"])
-    targets = load_image_set(config["targets"], to_grayscale=True)
+    targets = load_image_set(config["targets"])
 
     patch_processor = config["patch_processor"]
 
@@ -126,10 +124,13 @@ def evaluate(images, predictions, targets, config):
     print "y_scores:", y_true[:100]
     y_true[y_true < 0.5] = 0
     y_true[y_true >= 0.5] = 1
+    y_true = y_true.astype(bool)
     print "y_scores:", y_true[:100]
+    print "y_true shape:", y_true.shape
+    print "y_scores shape:", y_scores.shape
 
     # Area under the ROC curve
-    fpr, tpr, thresholds = roc_curve((y_true), y_scores)
+    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
     AUC_ROC = roc_auc_score(y_true, y_scores)
     # test_integral = np.trapz(tpr,fpr) #trapz is numpy integration
     print "\nArea under the ROC curve: " + str(AUC_ROC)
@@ -209,7 +210,7 @@ def predict_eval(config):
 def retrain_nn(config):
     LOG.info("retrain neural net with config: {}".format(config))
     images  = load_image_set(config.get('images'))
-    targets = load_image_set(config.get('targets'), to_grayscale=True)
+    targets = load_image_set(config.get('targets'))
 
     LOG.info("images shape: {}".format(images.shape))
     LOG.info("targets shape: {}".format(targets.shape))

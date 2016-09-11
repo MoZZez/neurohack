@@ -1,16 +1,8 @@
 import numpy as np
 import random
-import ConfigParser
-
 from help_functions import load_hdf5
-from help_functions import visualize
-from help_functions import group_images
-
 from pre_processing import my_PreProc
 
-
-#To select the same images
-# random.seed(10)
 
 #Load the original data and return the extracted patches for training/testing
 def get_data_training(DRIVE_train_imgs_original,DRIVE_train_groudTruth, DRIVE_test_imgs_original, DRIVE_test_groudTruth, Imgs_to_test, patch_height, patch_width, N_subimgs, inside_FOV):
@@ -283,31 +275,39 @@ def recompone_overlap(preds, img_h, img_w, stride_h, stride_w):
     assert (preds.shape[1]==1 or preds.shape[1]==3)  #check the channel is 1 or 3
     patch_h = preds.shape[2]
     patch_w = preds.shape[3]
-    N_patches_h = (img_h-patch_h)//stride_h+1
-    N_patches_w = (img_w-patch_w)//stride_w+1
+    N_patches_h = (img_h-patch_h)//stride_h+2
+    N_patches_w = (img_w-patch_w)//stride_w+2
     N_patches_img = N_patches_h * N_patches_w
     print "N_patches_h: " +str(N_patches_h)
     print "N_patches_w: " +str(N_patches_w)
     print "N_patches_img: " +str(N_patches_img)
-    assert (preds.shape[0]%N_patches_img==0)
     N_full_imgs = preds.shape[0]//N_patches_img
     print "According to the dimesions inserted, there are " +str(N_full_imgs) +" full images (of " +str(img_h)+"x" +str(img_w) +" each)"
     full_prob = np.zeros((N_full_imgs,preds.shape[1],img_h,img_w))  #itialize to zero mega array with sum of Probabilities
     full_sum = np.zeros((N_full_imgs,preds.shape[1],img_h,img_w))
+    print("full_prob.shape={}, full_sum.shape={}".format(full_prob.shape, full_sum.shape))
 
-    k = 0 #iterator over all the patches
     for i in range(N_full_imgs):
-        for h in range((img_h-patch_h)//stride_h+1):
-            for w in range((img_w-patch_w)//stride_w+1):
-                full_prob[i,:,h*stride_h:(h*stride_h)+patch_h,w*stride_w:(w*stride_w)+patch_w]+=preds[k]
-                full_sum[i,:,h*stride_h:(h*stride_h)+patch_h,w*stride_w:(w*stride_w)+patch_w]+=1
-                k+=1
-    assert(k==preds.shape[0])
-    assert(np.min(full_sum)>=1.0)  #at least one
+        for h in range(N_patches_h-1):
+            for w in range(N_patches_w-1):
+                patch_height_begin = h*stride_h
+                patch_height_end = h*stride_h+patch_h
+                patch_width_begin = w*stride_w
+                patch_width_end = w*stride_w+patch_w
+                k = w + N_patches_w * (h + i * N_patches_h)
+                try:
+                    full_prob[i, :, patch_height_begin:patch_height_end, patch_width_begin:patch_width_end] += preds[k]
+                    full_sum [i, :, patch_height_begin:patch_height_end, patch_width_begin:patch_width_end] += 1
+                except Exception as e:
+                    print("i={}, h={}, w={}, k={}".format(i,h,w,k))
+                    print("patch_height_begin={}, patch_height_end={}, patch_width_begin={}, patch_width_end={}".format(
+                        patch_height_begin, patch_height_end,patch_width_begin,patch_width_end
+                    ))
+                    print("preds.shape={}, preds[k].shape={}".format(preds.shape, preds[k].shape))
+                    print("full_prob.shape={}, full_sum.shape={}".format(full_prob.shape, full_sum.shape))
+                    raise e
     final_avg = full_prob/full_sum
-    print final_avg.shape
-    assert(np.max(final_avg)<=1.0) #max value for a pixel is 1.0
-    assert(np.min(final_avg)>=0.0) #min value for a pixel is 0.0
+    print ("final_avg.shape: {}".format(final_avg.shape))
     return final_avg
 
 
@@ -453,7 +453,10 @@ class OverlapPatchProcessor(object):
                                        self.stride_height,
                                        self.stride_width)
 
-    def recpomone(self, patches):
+    def recompone(self, patches):
+        print("Recompone called. Patches shape {}".format(patches.shape))
+        print("Image size: {}x{}".format(self.image_height, self.image_width))
+        print("Stride size: {}x{}".format(self.stride_height, self.stride_width))
         return recompone_overlap(patches,
                                  self.image_height,
                                  self.image_width,
