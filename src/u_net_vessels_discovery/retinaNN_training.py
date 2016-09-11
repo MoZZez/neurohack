@@ -8,16 +8,11 @@
 ##################################################
 
 
-import numpy as np
 import ConfigParser
 
 from keras.models import Model
 from keras.layers import Input, merge, Convolution2D, MaxPooling2D, UpSampling2D, Reshape, core, Dropout
-from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from keras import backend as K
-#from keras.utils.visualize_util import plot
-from keras.optimizers import SGD
 
 from help_functions import *
 
@@ -60,8 +55,6 @@ def create_nn_architectire(n_ch, patch_height, patch_width):
     conv7 = core.Activation('softmax')(conv6)
 
     model = Model(input=inputs, output=conv7)
-
-    # sgd = SGD(lr=0.01, decay=1e-6, momentum=0.3, nesterov=False)
     model.compile(optimizer='sgd', loss='categorical_crossentropy',metrics=['accuracy'])
 
     return model
@@ -107,23 +100,17 @@ def train(config):
     model = create_nn_architectire(n_ch, patch_height, patch_width)  #the U-net model
     print "Check: final output of the network:"
     print model.output_shape
-    #plot(model, to_file='./'+name_experiment+'/'+name_experiment + '_model.png')   #check how the model looks like
     json_string = model.to_json()
     open('./'+name_experiment+'/'+name_experiment +'_architecture.json', 'w').write(json_string)
 
-
     checkpointer = ModelCheckpoint(filepath='./'+name_experiment+'/'+name_experiment +'_best_weights.h5', verbose=1, monitor='val_loss', mode='auto', save_best_only=True) #save at each epoch if the validation decreased
-
-
     model.fit(patches_imgs_train, masks_Unet(patches_masks_train), nb_epoch=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_data=(patches_imgs_test, masks_Unet(patches_masks_test)), callbacks=[checkpointer])
-
-    return model
-    #========== Save and test the last model ===================
     model.save_weights('./'+name_experiment+'/'+name_experiment +'_last_weights.h5', overwrite=True)
+    return model
 
 def main():
     config = ConfigParser.RawConfigParser()
-    config.read('configuration.txt')
+    config.read('retina.conf')
     train(config)
 
 

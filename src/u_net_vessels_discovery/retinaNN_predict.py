@@ -7,25 +7,19 @@
 #
 ##################################################
 
-# Python
-import numpy as np
 import ConfigParser
+
+from keras.callbacks import ModelCheckpoint
 from matplotlib import pyplot as plt
-# Keras
 from keras.models import model_from_json
-from keras.models import Model
-# scikit learn
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import jaccard_similarity_score
 from sklearn.metrics import f1_score
-# help_functions.py
 from help_functions import *
-# extract_patches.py
 from extract_patches import recompone
-# pre_processing.py
 from pre_processing import my_PreProc
 import cv2
 import os
@@ -64,7 +58,10 @@ def load_model(model_structure, model_weights):
     return model
 
 
-def predict_internal(images, targets, config):
+def predict(config):
+    images  = load_image_set(config.get('data paths', 'images'))
+    targets = load_image_set(config.get('data paths', 'targets'), to_grayscale=True)
+
     patch_height = int(config.get('data attributes', 'patch_height'))
     patch_width = int(config.get('data attributes', 'patch_width'))
 
@@ -206,18 +203,46 @@ def evaluate(images, predictions, targets, config):
     file_perf.close()
 
 
-def predict(config):
+def retrain_nn(config):
+    model = load_model(config.get("retrain", "model_architecture"),
+                       config.get("retrain", "model_weights"))
     images  = load_image_set(config.get('data paths', 'images'))
     targets = load_image_set(config.get('data paths', 'targets'), to_grayscale=True)
-    images_restored, predictions_restored, targets_restored = predict_internal(images, targets, config)
-    evaluate(images_restored, predictions_restored, targets_restored, config)
+
+    images_train = images[:-1,:,:,:]
+    targets_train = targets[:-1,:,:,:]
+    images_test = images[-1:,:,:,:]
+    targets_test = targets[-1:,:,:,:]
+    images_train_patches, targets_targets_patches = split_to_patches(images_train,
+                                                                     targets_train,
+                                                                     int(config.get('data attributes', 'patch_height')),
+                                                                     int(config.get('data attributes', 'patch_width')))
+    images_test_patches, targets_test_patches = split_to_patches(images_test,
+                                                                 targets_test,
+                                                                 int(config.get('data attributes', 'patch_height')),
+                                                                 int(config.get('data attributes', 'patch_width')))
+
+    model_checkpoint = ModelCheckpoint(filepath=config.get("retrain", "best_weights"),
+                                       verbose=1,
+                                       monitor='val_loss',
+                                       mode='auto',
+                                       save_best_only=True)
+    model.fit(images_train_patches,
+              masks_Unet(targets_targets_patches),
+              nb_epoch=config.get("retrain", "N_epochs"),
+              batch_size=config.get("retrain", "batch_size"),
+              verbose=2,
+              shuffle=True,
+              validation_data=(images_test_patches, masks_Unet(targets_test_patches)),
+              callbacks=[model_checkpoint])
+    model.save_weights(config.get("retrain", "last_weights"), overwrite=True)
 
 
 def main():
     config = ConfigParser.RawConfigParser()
-    config.read('configuration.txt')
-    predict(config)
-
+    config.read('retina.conf')
+    images_restored, predictions_restored, targets_restored = predict(config)
+    evaluate(images_restored, predictions_restored, targets_restored, config)
 
 if __name__ == "__main__":
     main()
