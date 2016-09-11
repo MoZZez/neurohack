@@ -1,3 +1,4 @@
+import ConfigParser
 import h5py
 import numpy as np
 from PIL import Image
@@ -89,3 +90,9 @@ def pred_to_imgs(pred,mode="original"):
         exit()
     pred_images = np.reshape(pred_images,(pred_images.shape[0],1,48,48))
     return pred_images
+
+
+def load_config(filename):
+    config = ConfigParser.RawConfigParser()
+    config.read(filename)
+    return config

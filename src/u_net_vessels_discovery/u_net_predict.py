@@ -9,6 +9,7 @@
 
 import ConfigParser
 
+import argh
 from keras.callbacks import ModelCheckpoint
 from matplotlib import pyplot as plt
 from keras.models import model_from_json
@@ -238,11 +239,14 @@ def retrain_nn(config):
     model.save_weights(config.get("retrain", "last_weights"), overwrite=True)
 
 
-def main():
-    config = ConfigParser.RawConfigParser()
-    config.read('retina.conf')
-    images_restored, predictions_restored, targets_restored = predict(config)
-    evaluate(images_restored, predictions_restored, targets_restored, config)
+@argh.arg('config', type=load_config, help='config file')
+@argh.arg('--retrain', type=bool, help='retrain or predict')
+def main(config, retrain=False):
+    if not retrain:
+        images_restored, predictions_restored, targets_restored = predict(config)
+        evaluate(images_restored, predictions_restored, targets_restored, config)
+    else:
+        retrain_nn(config)
 
 if __name__ == "__main__":
-    main()
+    argh.dispatch_command(main)
